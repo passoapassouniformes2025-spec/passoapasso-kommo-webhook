@@ -131,9 +131,24 @@ app.post('/webhook', async (req, res) => {
     for (const talk of talksUpdate) {
       const leadId = talk.entity_id || talk.lead_id;
       if (!leadId) continue;
-      console.log(`[UPDATE_TALK] talk_id ${talk.id || talk.talk_id} | lead ${leadId}`);
-      // Pequena espera para a mensagem ser gravada no sistema
-      setTimeout(() => processarLead(leadId, ''), 2000);
+      // Loga payload completo para diagnóstico (sem truncar)
+      console.log(`[UPDATE_TALK] Payload:`, JSON.stringify(talk));
+      // Tenta extrair texto da mensagem diretamente do payload do webhook
+      const textoMsg = talk.message?.text || talk.last_message || talk.params?.text || '';
+      console.log(`[UPDATE_TALK] lead ${leadId} | msg extraída: "${textoMsg.substring(0, 200)}"`);
+      // Aguarda 3s para garantir que a mensagem foi gravada no sistema
+      setTimeout(() => processarLead(leadId, textoMsg), 3000);
+    }
+
+    // Evento: novo talk criado (primeira mensagem de nova conversa)
+    const talksAdd = body?.talks?.add || [];
+    for (const talk of talksAdd) {
+      const leadId = talk.entity_id || talk.lead_id;
+      if (!leadId) continue;
+      console.log(`[ADD_TALK] Payload:`, JSON.stringify(talk));
+      const textoMsg = talk.message?.text || talk.last_message || talk.params?.text || '';
+      console.log(`[ADD_TALK] lead ${leadId} | msg extraída: "${textoMsg.substring(0, 200)}"`);
+      setTimeout(() => processarLead(leadId, textoMsg), 3000);
     }
   } catch (err) {
     console.error('[ERRO]', err.message);
@@ -145,9 +160,10 @@ const leadsProcessados = new Set();
 
 async function polling() {
   try {
-    const cincoMinAtras = Math.floor(Date.now() / 1000) - 300;
+    // Janela de 30 min para capturar leads WABA que demoram para aparecer
+    const trintaMinAtras = Math.floor(Date.now() / 1000) - 1800;
     const res = await fetch(
-      `${BASE}/leads?filter[pipeline_id]=${PIPELINE_ID}&filter[status_id]=${ETAPA_ENTRADA}&filter[created_at][from]=${cincoMinAtras}&limit=20`,
+      `${BASE}/leads?filter[pipeline_id]=${PIPELINE_ID}&filter[status_id]=${ETAPA_ENTRADA}&filter[created_at][from]=${trintaMinAtras}&limit=50`,
       { headers: headers() }
     );
     if (!res.ok) return;
