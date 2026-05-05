@@ -86,7 +86,7 @@ app.post('/webhook', async (req, res) => {
       const pipelineId = lead.pipeline_id;
 
       // Só processa leads do pipeline principal (evita loop)
-      if (pipelineId !== PIPELINE.main) continue;
+      if (Number(pipelineId) !== PIPELINE.main) continue;
 
       // Pega dados completos do lead (com notes = mensagem inicial)
       const leadData = await getLead(leadId);
